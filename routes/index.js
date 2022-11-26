@@ -1,20 +1,15 @@
 const express = require('express');
-const{getProducts} = require ('../controllers');
-const{getProductsCart} = require ('../controllers');
-const{deleteProduct} = require ('../controllers');
-const{addProduct} = require ('../controllers');
-const{addProductCart} = require ('../controllers');
+const{signUpAcount} = require ('../controllers');
+const{signInAcount} = require ('../controllers');
+const{addfundsAcount} = require ('../controllers');
+const{addingProductsToCart} = require ('../controllers');
+const router = express.Router();
 
-    const router = express.Router();
-
-    router.get('/products', getProducts);
-    router.get('/products-cart', getProductsCart);
-    router.post('/products-cart', addProductCart);
-    router.put('/products-cart/:productId', addProduct);
-    router.delete('/products-cart/:productId', deleteProduct);
-    
-  
-    
+    router.post('/signup-acount', signUpAcount);
+    router.get('/signin-acount', signInAcount);
+    router.put('/add-funds/:id', addfundsAcount);;
+    router.post('/add-cart/:id', addingProductsToCart);
+ 
 
     module.exports = {
         router

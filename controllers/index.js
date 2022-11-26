@@ -1,160 +1,247 @@
-const { connect } = require('mongoose');
+
 const FS = require('../firebase');
 const { db } = FS;
-const Cart = require('../models/Cart');
-const Product = require('../models/Product');
+const products = []
 
-//Primer Endpoint: Obtener Productos
-const getProducts = async (req, res) => {
+//Primer Endpoint: Crear la cuenta
+const signUpAcount = async (req, res) => {
     try {
-        const products = await Product.find();
-        res.send({ products });
-    } catch (error) {
-        res.send({
-            Warning: "There is no products"
-        })
-    }
-}
-//Segundo Endpoint: Obtener Productos del Carrito
-const getProductsCart = async (req, res) => {
-    try {
-        const productsCart = await Cart.find();
-        res.send({ productsCart });
-    } catch (error) {
-        res.send({
-            Warning: "There is no products in the cart"
-        })
-    }
-}
+        //It is necesarry that the user enter an email and a password
+        const { body } = req;
+        const { email: userEmail, password: userPassword } = body;
+        //Default values money to all the new accounts
+        const money = 0
 
-//Tercer Endpoint: Agregar Producto al Carrito
-const addProductCart = async (req, res) => {
-    try {
-        //Se solicita que se ingresa el nombre la imagen y el precio
-        const { name, img, price } = req.body;
-        // se busca si ya existe el producto
-        const productExist = await Product.findOne({ name })
-        // Se verifica que vengan todos los datos
-        const isNotEmpty = name !== "" && img !== "" && price !== "";
-        // se verifica si este esta en el carrito
-        const productInCart = await Cart.findOne({ name })
+        //Verifiying that the user doesnt send empty info
+        if (userEmail && userPassword) {
+            //Entering the database
+            const acountDB = db.collection('acounts');
+            //creating an account with the inputed data, and with a field that is money with
+            // a default values of 0
+            const { _path: { segments } } = await acountDB.add({ body, money });
 
-        //Si no existe el producto
-        if (!productExist) {
+            const id = segments[1];
+            //It returns the user data
             res.send({
-                status: 404,
-                Error: "This product isnt found"
+                status: 200,
+                Message: "Succesfully signed up",
+                id,
+                email: body.email,
+                password: body.password,
+                products: products,
+                money: money
+            })
+        } else {
+            res.send("Warning: Missing info")
+        }
+    } catch (error) {
+        res.send("An error ocurred")
+    }
+}
+
+//second endpoint for siging in
+const signInAcount = async (req, res) => {
+    try {
+        //The user needs to send an email and a password for looking it up in the database
+        const { body } = req;
+
+        //asking the email as a parameter
+
+        const { email: userEmail, password: userPassword } = body;
+
+        //Verifiying that the user isnt sending empy info
+        if (userEmail && userPassword) {
+
+            //Entering the database and obtaining all the info
+            const acountDB = await db.collection('acounts').get();
+
+            //filtering all the unnecessary info from the database
+            const resp = acountDB.docs.map(doc => doc.data());
+
+            //Searching the user emain in the emails of the database
+            const emailFound = resp.find(x => x.body.email == userEmail);
+
+
+            //If the email exist then
+            if (emailFound) {
+
+                //verifying that the passwords match
+                if (userPassword === emailFound.body.password) {
+                    //Sending info succesfully
+                    res.send({
+                        status: 200,
+                        Message: "Succesfully loged in",
+                        email: emailFound.body.email,
+                        password: emailFound.body.password,
+                        products: products,
+                        money: emailFound.money
+                    })
+
+                    //if the passwords mismatch send warning
+                } else {
+                    res.send("Warning: Missmatch password")
+                }
+            }
+            //if the email isnt found send warning
+            else {
+                res.send("Warning: Email not found")
+            }
+            //If the user didnt send complete info send a warning
+        } else {
+            res.send("Warning: Missing info")
+        }
+    } catch (error) {
+        res.send("An error ocurred")
+    }
+}
+
+
+//third endopint for adding funds to an account
+const addfundsAcount = async (req, res) => {
+    try {
+        //asking the user id
+        const { params: { id } } = req
+        //asking the user the quantity of funds to add
+        const { body } = req
+        const { money: newFunds } = body
+
+        //verify that the entes a valid number
+        if ((newFunds > 0 && typeof newFunds === 'number')) {
+
+            //entering the databse and retrieving the user data
+            const acountDB = db.collection('acounts').doc(id)
+            const { _fieldsProto } = await acountDB.get()
+
+            //Serach if the user has money
+
+            const moneyFound = _fieldsProto.money;
+
+
+            //if the user the field of money
+            if (moneyFound) {
+
+                // Obtaining the ustored money of the account
+                const savedMoney = parseInt(_fieldsProto.money.integerValue)
+                //add up the new quantity anl the saved one
+                const newMoney = newFunds + savedMoney
+                //uploading the new info to the database
+                const resp = await acountDB.update({
+                    money: newMoney
+                })
+
+
+                //send tthe user info
+                res.send({
+                    status: 200,
+                    Message: "Funds Added succesfully",
+                    email: _fieldsProto.body.mapValue.fields.email.stringValue,
+                    password: _fieldsProto.body.mapValue.fields.password.stringValue,
+                    money: newMoney
+
+                })
+            }
+            else {
+                res.send({
+                    status: 404,
+                    Message: "Money not found",
+
+                })
+            }
+        }
+        //if the user inputed an invalid number or character
+        else {
+            res.send({
+                //send warning
+                status: 505,
+                Error: "Warning: You entered a negative number or a invalid character"
+            })
+        }
+    } catch (error) {
+        res.send("An error ocurred")
+    }
+}
+
+const addingProductsToCart = async (req, res) => {
+    try {
+        //asking the user id
+        const { params: { id } } = req
+        //asking the user iformation of the products 
+        const { body } = req
+        const { operation, productName, productPrice, productImg, amount, totalPrice } = body
+        //validating the informaition inputted
+        if (productName && productImg && productPrice && amount && operation && totalPrice) {
+            //if the infoprmation is complete, then acces to the databese and retrieve user info
+            const acountDB = db.collection('acounts').doc(id)
+            const userData = await acountDB.get()
+            const { _fieldsProto } = await acountDB.get()
+
+            console.log(_fieldsProto.products)
+
+            //Retrieving the user money
+            const { money } = userData.data()
+            //Retrieving the user products
+            const { products } = userData.data()
+            //search if the product exist
+            const product = products.find(x => x.productName === productName)
+            if (operation === "add") { //if the opertaion is add
+                if (product) { //if found
+                    //add up the amount and the total_prize
+                    product.amount += amount;
+                    product.totalPrice += totalPrice;
+                }
+                else {  //if not found, add the new product info to the database
+                    console.log("hola2")
+                    products.push({ productName, productImg, productPrice, amount, totalPrice })
+
+                }
+                res.send({
+                    status: 200,
+                    Message: "Succesfully updated the product",
+                    User_Money: money,
+                    products
+
+                })
+                await acountDB.update({ products })
+            } else { //if the user is reducing the amount
+                if (product&&product.amount>0) { //if found
+                    //add up the amount and the total_prize
+                    product.amount -= amount;
+                    product.totalPrice -= totalPrice;
+                    res.send({
+                        status: 200,
+                        Message: "Succesfully updated the product",
+                        User_Money: money,
+                        products
+    
+                    })
+                    await acountDB.update({ products })
+                }
+                else {  //if not found, send warning
+                    res.send({
+                        status: 200,
+                        waning: "This product isnt in the cart anymore",
+                        User_Money: money,
+                        products
+    
+                    })
+                }
+            }
+
+        } else {  // if the information isnt complete send warning
+            res.send({
+                status: 505,
+                Warning: "Missing Information",
+
             })
         }
 
-        //si se envia un producto no vacio y no esta en el carrito se agrega
-        else if (isNotEmpty && !productInCart) {
-            const newProductCart = new Cart({ name, img, price, amount: 1 });
-            await Product.findByIdAndUpdate(
-                productExist?._id,
-                { inCart: true, name, img, price },
-                { new: true }
-            )
-                .then((product) => {
-                    newProductCart.save();
-                    res.send({
-                        status: 200,
-                        Message: 'The product was added succesfully',
-                        product,
-                    });
-                })
-                .catch((error) => console.error(error));
-            //Si el producto esta en el carrito
-        } else if (productInCart) {
-            res.send({
-                status: 400,
-                Message: 'The product is alredy in the cart',
-            });
-        }
     } catch (error) {
-        res.send("An error ocurred")
+        res.send(`An error ocurred`)
     }
 }
-
-//Cuarto endpoint, agregar un producto
-const addProduct = async (req, res) => {
-    try {
-        const { productId } = req.params;
-        const { query } = req.query;
-        const body = req.body;
-
-        //Se busca el producto en el carrito
-        const productSearch = await Cart.findById(productId);
-
-        if (!query) {
-            res.send({
-                status: 404,
-                Message: 'You must send a query',
-            });
-        } else if (productSearch && query === "add") {
-            body.amount = body.amount + 1;
-            await Cart.findByIdAndUpdate(productId, body, {
-                new: true,
-            }).then((product) => {
-                res.send({
-                    status: 200,
-                    Message: `The product ${product.name} was succesfully updated`,
-                    product,
-                });
-            });
-        } else if (productSearch && query === "del") {
-            body.amount = body.amount - 1;
-            await Cart.findByIdAndUpdate(productId, body, {
-                new: true,
-            }).then((product) => {
-                res.send({
-                    status: 200,
-                    Message: `The product ${product.name} was succesfully updated`,
-                    product,
-                });
-            });
-        }
-    }
-    catch (error) {
-        res.send("An error ocurred")
-    }
-}
-
-
-const deleteProduct = async (req, res) => {
-    try {
-        const { productId } = req.params;
-
-        //Buscar en el carrito
-        const productInCart = await Cart.findById(productId);
-
-        //Se busca en la base de datos atraves del nombre
-        const { name, img, price, _id } = await Product.findOne({
-            name: productInCart.name,
-        });
-
-        //Se busca y se eliminael producto con dicha id
-        await Cart.findByIdAndDelete(productId);
-        await Product.findByIdAndUpdate(_id,
-            { inCart: false, name, img, price },
-            { new: true }
-        ).then((product) => {
-            res.send({
-                status: 200,
-                Message: `The product ${product.name} was succesfully deleted of the cart`,
-                product,
-            });
-        });
-    } catch {
-        res.send("An error ocurred")
-    }
-
-}
-
 module.exports = {
-    getProducts,
-    getProductsCart,
-    addProductCart,
-    addProduct,
-    deleteProduct
+    signUpAcount,
+    signInAcount,
+    addfundsAcount,
+    addingProductsToCart
 }
