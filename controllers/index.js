@@ -70,6 +70,7 @@ const signInAcount = async (req, res) => {
                     //Sending info succesfully
                     res.send({
                         status: 200,
+                        id: "",
                         Message: "Succesfully loged in",
                         email: emailFound.body.email,
                         password: emailFound.body.password,
@@ -169,13 +170,14 @@ const addingProductsToCart = async (req, res) => {
         const { body } = req
         const { operation, productName, productPrice, productImg, amount, totalPrice } = body
         //validating the informaition inputted
+
         if (productName && productImg && productPrice && amount && operation && totalPrice) {
             //if the infoprmation is complete, then acces to the databese and retrieve user info
             const acountDB = db.collection('acounts').doc(id)
             const userData = await acountDB.get()
             const { _fieldsProto } = await acountDB.get()
 
-            console.log(_fieldsProto.products)
+            
 
             //Retrieving the user money
             const { money } = userData.data()
@@ -190,7 +192,7 @@ const addingProductsToCart = async (req, res) => {
                     product.totalPrice += totalPrice;
                 }
                 else {  //if not found, add the new product info to the database
-                    console.log("hola2")
+                 
                     products.push({ productName, productImg, productPrice, amount, totalPrice })
 
                 }
@@ -203,7 +205,7 @@ const addingProductsToCart = async (req, res) => {
                 })
                 await acountDB.update({ products })
             } else { //if the user is reducing the amount
-                if (product&&product.amount>0) { //if found
+                if (product && product.amount > 0) { //if found
                     //add up the amount and the total_prize
                     product.amount -= amount;
                     product.totalPrice -= totalPrice;
@@ -212,17 +214,17 @@ const addingProductsToCart = async (req, res) => {
                         Message: "Succesfully updated the product",
                         User_Money: money,
                         products
-    
+
                     })
                     await acountDB.update({ products })
                 }
                 else {  //if not found, send warning
                     res.send({
                         status: 200,
-                        waning: "This product isnt in the cart anymore",
+                        waning: "This product isnt in the cart ",
                         User_Money: money,
                         products
-    
+
                     })
                 }
             }
@@ -239,9 +241,42 @@ const addingProductsToCart = async (req, res) => {
         res.send(`An error ocurred`)
     }
 }
+
+//unico endpoint
+const addDataAcount = async (req, res) => {
+    try {
+        //asking the product info
+        const { body } = req
+        const { email: email, productName: UserproductName, productPrice: UserproductPrice, productImg: UserproductImg, amount: Useramount, totalPrice: UsertotalPrice } = body
+        const money = 0
+        //Verifiying that
+       
+        if (email && UserproductName && UserproductImg && UserproductPrice && Useramount && UsertotalPrice) {
+            const acountDB = db.collection('acounts');
+            const { _path: { segments } } = await acountDB.add({ body, money });
+            const id = segments[1];
+            res.send({
+                status: 200,
+                Message: "Succesfully uploaded data",
+                id,
+                email,
+                money: money
+            })
+        } else {  // if the information isnt complete send warning
+            res.send({
+                status: 505,
+                Warning: "Missing Information",
+
+            })
+        }
+    }
+    catch { }
+}
+
 module.exports = {
     signUpAcount,
     signInAcount,
     addfundsAcount,
-    addingProductsToCart
+    addingProductsToCart,
+    addDataAcount
 }
