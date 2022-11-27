@@ -170,15 +170,12 @@ const addingProductsToCart = async (req, res) => {
         const { body } = req
         const { operation, productName, productPrice, productImg, amount, totalPrice } = body
         //validating the informaition inputted
-
+        console.log(body)
         if (productName && productImg && productPrice && amount && operation && totalPrice) {
             //if the infoprmation is complete, then acces to the databese and retrieve user info
             const acountDB = db.collection('acounts').doc(id)
             const userData = await acountDB.get()
-            const { _fieldsProto } = await acountDB.get()
-
             
-
             //Retrieving the user money
             const { money } = userData.data()
             //Retrieving the user products
@@ -247,30 +244,29 @@ const addDataAcount = async (req, res) => {
     try {
         //asking the product info
         const { body } = req
-        const { email: email, productName: UserproductName, productPrice: UserproductPrice, productImg: UserproductImg, amount: Useramount, totalPrice: UsertotalPrice } = body
-        const money = 0
+        const {  title, description, thumbnail, price } = body
+        const amount = 1
         //Verifiying that
        
-        if (email && UserproductName && UserproductImg && UserproductPrice && Useramount && UsertotalPrice) {
+        if (title && description && thumbnail &&  price ) {
             const acountDB = db.collection('acounts');
-            const { _path: { segments } } = await acountDB.add({ body, money });
+            const { _path: { segments } } = await acountDB.add({ body, amount });
             const id = segments[1];
             res.send({
                 status: 200,
                 Message: "Succesfully uploaded data",
                 id,
-                email,
-                money: money
+                
             })
         } else {  // if the information isnt complete send warning
             res.send({
                 status: 505,
-                Warning: "Missing Information",
+                Warning: "Missing Information sdadasdasdsad",
 
             })
         }
     }
-    catch { }
+    catch(error) {console.log(error) }
 }
 
 module.exports = {
